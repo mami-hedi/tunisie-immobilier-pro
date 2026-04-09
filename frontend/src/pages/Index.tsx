@@ -151,8 +151,8 @@ export default function Index() {
   size="lg"
   className="text-lg px-8 border-secondary-foreground/30 text-red-600 hover:bg-red-100"
 >
-  <a href="tel:+21671000000">
-    +216 71 000 000
+  <a href="tel:+21620007193">
+    +216 20 007 193
   </a>
 </Button>
 

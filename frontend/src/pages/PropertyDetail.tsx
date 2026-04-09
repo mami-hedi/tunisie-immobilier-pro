@@ -1,74 +1,182 @@
 import { useParams, Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getPropertyById, formatPrice, getRecentProperties } from "@/data/properties";
 import { PropertyCard } from "@/components/PropertyCard";
+import { api } from "@/lib/api";
 import {
-  ArrowLeft,
-  MapPin,
-  Maximize,
-  BedDouble,
-  Bath,
-  Phone,
-  MessageCircle,
-  Mail,
-  Share2,
-  Heart,
-  ChevronLeft,
-  ChevronRight,
-  Check,
+  ArrowLeft, MapPin, Maximize, BedDouble, Bath,
+  Phone, MessageCircle, Mail, Share2, Heart,
+  ChevronLeft, ChevronRight, Check, Loader2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+const BASE_URL = "http://localhost:5000";
+
+function formatPrice(price: number, transaction: string) {
+  const formatted = new Intl.NumberFormat("fr-TN").format(price);
+  return transaction === "location"
+    ? `${formatted} DT / mois`
+    : `${formatted} DT`;
+}
+
+function adaptAnnonce(a: any) {
+  return {
+    id: String(a.id),
+    title: a.titre,
+    price: Number(a.prix),
+    type: a.type_bien,
+    transactionType: a.type_transaction,
+    surface: Number(a.surface) || 0,
+    rooms: Number(a.nb_pieces) || 0,
+    bedrooms: Number(a.nb_chambres) || 0,
+    bathrooms: Number(a.nb_salles_bain) || 0,
+    governorate: a.gouvernorat,
+    city: a.ville,
+    address: a.adresse || "",
+    description: a.description || "",
+    images: a.images?.length
+      ? a.images.map((img: any) => `${BASE_URL}${img.url}`)
+      : ["/placeholder.svg"],
+    features: a.features || [],
+    contact: {
+      name: a.nom_contact || "",
+      phone: a.tel_contact || "",
+      email: a.email_contact || "",
+    },
+    createdAt: a.created_at,
+  };
+}
+
+function adaptAnnonceSimple(a: any) {
+  return {
+    id: String(a.id),
+    title: a.titre,
+    price: Number(a.prix),
+    type: a.type_bien,
+    transactionType: a.type_transaction,
+    surface: Number(a.surface) || 0,
+    rooms: Number(a.nb_pieces) || 0,
+    bedrooms: Number(a.nb_chambres) || 0,
+    bathrooms: Number(a.nb_salles_bain) || 0,
+    governorate: a.gouvernorat,
+    city: a.ville,
+    address: a.adresse || "",
+    description: a.description || "",
+    images: a.image_principale
+      ? [`${BASE_URL}${a.image_principale}`]
+      : ["/placeholder.svg"],
+    features: [],
+    contact: { name: a.nom_contact || "", phone: a.tel_contact || "", email: a.email_contact || "" },
+    createdAt: a.created_at,
+    isFeatured: false,
+  };
+}
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
-  const property = getPropertyById(id || "");
+  const [property, setProperty]         = useState<any>(null);
+  const [similar, setSimilar]           = useState<any[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showContactForm, setShowContactForm] = useState(false);
+  const [showContactForm, setShowContactForm]     = useState(false);
+  const [formData, setFormData] = useState({ nom: "", tel: "", message: "" });
+  const [sending, setSending]   = useState(false);
+  const [sent, setSent]         = useState(false);
 
-  if (!property) {
-    return (
-      <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center pt-24">
-          <div className="text-center">
-            <h1 className="font-display text-3xl font-bold mb-4">Bien non trouvé</h1>
-            <p className="text-muted-foreground mb-8">
-              Ce bien n'existe pas ou a été retiré de notre catalogue.
-            </p>
-            <Button asChild>
-              <Link to="/biens">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Retour aux biens
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setError("");
+    setCurrentImageIndex(0);
 
-  const similarProperties = getRecentProperties(3).filter((p) => p.id !== property.id);
+    api.getAnnonce(Number(id))
+      .then((data: any) => {
+        const adapted = adaptAnnonce(data);
+        setProperty(adapted);
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
-  };
+        // Charger les biens similaires (même type_bien)
+        return api.getAnnonces({
+          type_bien: data.type_bien,
+          statut: "active",
+          limit: 4,
+        }).then((res: any) => {
+          const others = (res.annonces || [])
+            .filter((a: any) => String(a.id) !== String(id))
+            .slice(0, 3)
+            .map(adaptAnnonceSimple);
+          setSimilar(others);
+        });
+      })
+      .catch(() => setError("Ce bien n'existe pas ou a été retiré."))
+      .finally(() => setLoading(false));
+  }, [id]);
 
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
-  };
+  const nextImage = () =>
+    setCurrentImageIndex(p => (p + 1) % property.images.length);
+  const prevImage = () =>
+    setCurrentImageIndex(p => (p - 1 + property.images.length) % property.images.length);
 
   const handleWhatsApp = () => {
-    const message = encodeURIComponent(
+    const phone = property.contact?.phone || "+21658146177";
+    const msg = encodeURIComponent(
       `Bonjour, je suis intéressé(e) par le bien "${property.title}" (Réf: ${property.id}) à ${property.city}. Pouvez-vous me donner plus d'informations ?`
     );
-    window.open(`https://wa.me/+21658146177?text=${message}`, "_blank");
+    window.open(`https://wa.me/${phone.replace(/\s+/g, "")}?text=${msg}`, "_blank");
   };
 
   const handleCall = () => {
-    window.open("tel:+21658146177", "_self");
+    const phone = property.contact?.phone || "+21658146177";
+    window.open(`tel:${phone}`, "_self");
   };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ title: property.title, url: window.location.href });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    // Simulation envoi (à connecter à une vraie route email si besoin)
+    await new Promise(r => setTimeout(r, 1000));
+    setSent(true);
+    setSending(false);
+  };
+
+  // ── États de chargement / erreur ──────────────────────
+  if (loading) return (
+    <Layout>
+      <div className="min-h-[60vh] flex items-center justify-center pt-24">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Chargement du bien...</p>
+        </div>
+      </div>
+    </Layout>
+  );
+
+  if (error || !property) return (
+    <Layout>
+      <div className="min-h-[60vh] flex items-center justify-center pt-24">
+        <div className="text-center">
+          <h1 className="font-display text-3xl font-bold mb-4">Bien non trouvé</h1>
+          <p className="text-muted-foreground mb-8">
+            {error || "Ce bien n'existe pas ou a été retiré de notre catalogue."}
+          </p>
+          <Button asChild>
+            <Link to="/biens">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Retour aux biens
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </Layout>
+  );
 
   return (
     <Layout>
@@ -80,7 +188,7 @@ export default function PropertyDetail() {
             <span>/</span>
             <Link to="/biens" className="hover:text-primary transition-colors">Nos Biens</Link>
             <span>/</span>
-            <span className="text-foreground">{property.title}</span>
+            <span className="text-foreground truncate max-w-xs">{property.title}</span>
           </div>
         </div>
       </section>
@@ -89,66 +197,72 @@ export default function PropertyDetail() {
       <section className="py-8 bg-background">
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Images & Details */}
+
+            {/* ── Colonne gauche ── */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Image Gallery */}
+
+              {/* Galerie */}
               <div className="relative rounded-2xl overflow-hidden bg-muted aspect-[16/10]">
                 <img
                   src={property.images[currentImageIndex]}
                   alt={property.title}
                   className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                 />
 
-                {/* Navigation arrows */}
                 {property.images.length > 1 && (
                   <>
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors"
-                    >
+                    <button onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
                       <ChevronLeft className="h-5 w-5" />
                     </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors"
-                    >
+                    <button onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
                       <ChevronRight className="h-5 w-5" />
                     </button>
                   </>
                 )}
 
-                {/* Badges */}
                 <div className="absolute top-4 left-4 flex gap-2">
-                  <span className={property.transactionType === "Vente" ? "badge-sale" : "badge-rent"}>
-                    {property.transactionType}
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white
+                    ${property.transactionType === "vente" ? "bg-blue-600" : "bg-green-600"}`}>
+                    {property.transactionType === "vente" ? "Vente" : "Location"}
                   </span>
-                  {property.status !== "Disponible" && (
-                    <span className="badge-sold">{property.status}</span>
-                  )}
                 </div>
 
-                {/* Actions */}
                 <div className="absolute top-4 right-4 flex gap-2">
+                  <button onClick={handleShare}
+                    className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
+                    <Share2 className="h-5 w-5" />
+                  </button>
                   <button className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
                     <Heart className="h-5 w-5" />
                   </button>
-                  <button className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
-                    <Share2 className="h-5 w-5" />
-                  </button>
                 </div>
 
-                {/* Image counter */}
                 <div className="absolute bottom-4 right-4 bg-background/90 px-3 py-1 rounded-full text-sm">
                   {currentImageIndex + 1} / {property.images.length}
                 </div>
               </div>
 
-              {/* Property Info */}
+              {/* Miniatures */}
+              {property.images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {property.images.map((img: string, i: number) => (
+                    <button key={i} onClick={() => setCurrentImageIndex(i)}
+                      className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition
+                        ${i === currentImageIndex ? "border-primary" : "border-transparent"}`}>
+                      <img src={img} alt="" className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Infos */}
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <Badge variant="secondary" className="text-sm">
-                    {property.type}
-                  </Badge>
+                  <Badge variant="secondary" className="text-sm capitalize">{property.type}</Badge>
                   <span className="text-muted-foreground text-sm">Réf: {property.id}</span>
                 </div>
 
@@ -158,16 +272,21 @@ export default function PropertyDetail() {
 
                 <div className="flex items-center gap-2 text-muted-foreground mb-6">
                   <MapPin className="h-5 w-5 text-primary" />
-                  <span>{property.address}, {property.city}, {property.governorate}</span>
+                  <span>
+                    {[property.address, property.city, property.governorate]
+                      .filter(Boolean).join(", ")}
+                  </span>
                 </div>
 
-                {/* Key features */}
+                {/* Stats clés */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-muted rounded-xl mb-8">
-                  <div className="text-center">
-                    <Maximize className="h-6 w-6 text-primary mx-auto mb-2" />
-                    <div className="font-semibold">{property.surface} m²</div>
-                    <div className="text-sm text-muted-foreground">Surface</div>
-                  </div>
+                  {property.surface > 0 && (
+                    <div className="text-center">
+                      <Maximize className="h-6 w-6 text-primary mx-auto mb-2" />
+                      <div className="font-semibold">{property.surface} m²</div>
+                      <div className="text-sm text-muted-foreground">Surface</div>
+                    </div>
+                  )}
                   {property.rooms > 0 && (
                     <div className="text-center">
                       <BedDouble className="h-6 w-6 text-primary mx-auto mb-2" />
@@ -175,14 +294,14 @@ export default function PropertyDetail() {
                       <div className="text-sm text-muted-foreground">Pièces</div>
                     </div>
                   )}
-                  {property.bedrooms && (
+                  {property.bedrooms > 0 && (
                     <div className="text-center">
                       <BedDouble className="h-6 w-6 text-primary mx-auto mb-2" />
                       <div className="font-semibold">{property.bedrooms}</div>
                       <div className="text-sm text-muted-foreground">Chambres</div>
                     </div>
                   )}
-                  {property.bathrooms && (
+                  {property.bathrooms > 0 && (
                     <div className="text-center">
                       <Bath className="h-6 w-6 text-primary mx-auto mb-2" />
                       <div className="font-semibold">{property.bathrooms}</div>
@@ -192,36 +311,38 @@ export default function PropertyDetail() {
                 </div>
 
                 {/* Description */}
-                <div className="mb-8">
-                  <h2 className="font-display text-2xl font-semibold mb-4">Description</h2>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {property.description}
-                  </p>
-                </div>
-
-                {/* Features */}
-                <div>
-                  <h2 className="font-display text-2xl font-semibold mb-4">Caractéristiques</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {property.features.map((feature, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 text-muted-foreground"
-                      >
-                        <Check className="h-5 w-5 text-primary" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
+                {property.description && (
+                  <div className="mb-8">
+                    <h2 className="font-display text-2xl font-semibold mb-4">Description</h2>
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
+                      {property.description}
+                    </p>
                   </div>
-                </div>
+                )}
+
+                {/* Équipements */}
+                {property.features.length > 0 && (
+                  <div>
+                    <h2 className="font-display text-2xl font-semibold mb-4">Caractéristiques</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {property.features.map((feature: string, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-muted-foreground">
+                          <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                          <span>{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Right Column - Contact Card */}
+            {/* ── Colonne droite — Contact ── */}
             <div className="lg:col-span-1">
               <div className="sticky top-28">
                 <div className="bg-card border border-border rounded-2xl p-6 shadow-card">
-                  {/* Price */}
+
+                  {/* Prix */}
                   <div className="mb-6 pb-6 border-b border-border">
                     <div className="text-sm text-muted-foreground mb-1">Prix</div>
                     <div className="font-display text-3xl font-bold text-primary">
@@ -229,82 +350,82 @@ export default function PropertyDetail() {
                     </div>
                   </div>
 
-                  {/* Agency Info */}
-                  <div className="mb-6 pb-6 border-b border-border">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                        <span className="text-primary-foreground font-display font-bold text-xl">A</span>
-                      </div>
-                      <div>
-                        <div className="font-semibold">Annonce Tunisie</div>
-                        <div className="text-sm text-muted-foreground">Agence immobilière</div>
+                  {/* Contact vendeur */}
+                  {property.contact?.name && (
+                    <div className="mb-6 pb-6 border-b border-border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                          <span className="text-primary-foreground font-bold text-xl">
+                            {property.contact.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-semibold">{property.contact.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {property.contact.phone}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Contact Buttons */}
+                  {/* Boutons */}
                   <div className="space-y-3">
-                    <Button
-                      onClick={handleCall}
-                      className="w-full"
-                      size="lg"
-                    >
-                      <Phone className="mr-2 h-5 w-5" />
-                      Appeler l'agence
+                    <Button onClick={handleCall} className="w-full" size="lg">
+                      <Phone className="mr-2 h-5 w-5" /> Appeler
                     </Button>
-
-                    <Button
-                      onClick={handleWhatsApp}
-                      variant="secondary"
-                      className="w-full"
-                      size="lg"
-                    >
-                      <MessageCircle className="mr-2 h-5 w-5" />
-                      WhatsApp
+                    <Button onClick={handleWhatsApp} variant="secondary" className="w-full" size="lg">
+                      <MessageCircle className="mr-2 h-5 w-5" /> WhatsApp
                     </Button>
-
-                    <Button
-                      onClick={() => setShowContactForm(!showContactForm)}
-                      variant="outline"
-                      className="w-full"
-                      size="lg"
-                    >
-                      <Mail className="mr-2 h-5 w-5" />
-                      Envoyer un message
+                    <Button onClick={() => setShowContactForm(!showContactForm)}
+                      variant="outline" className="w-full" size="lg">
+                      <Mail className="mr-2 h-5 w-5" /> Envoyer un message
                     </Button>
                   </div>
 
-                  {/* Contact Form */}
+                  {/* Formulaire contact */}
                   {showContactForm && (
-                    <form className="mt-6 pt-6 border-t border-border space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Votre nom</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder="Nom complet"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Téléphone</label>
-                        <input
-                          type="tel"
-                          className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder="+216 XX XXX XXX"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Message</label>
-                        <textarea
-                          rows={3}
-                          className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                          placeholder="Je suis intéressé par ce bien..."
-                          defaultValue={`Je suis intéressé(e) par le bien "${property.title}". Pouvez-vous me recontacter ?`}
-                        />
-                      </div>
-                      <Button type="submit" className="w-full">
-                        Envoyer
-                      </Button>
+                    <form onSubmit={handleSendMessage}
+                      className="mt-6 pt-6 border-t border-border space-y-4">
+                      {sent ? (
+                        <div className="text-center py-4">
+                          <Check className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                          <p className="font-medium text-green-600">Message envoyé !</p>
+                          <p className="text-sm text-muted-foreground">Nous vous recontacterons bientôt.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Votre nom</label>
+                            <input type="text" required
+                              value={formData.nom}
+                              onChange={e => setFormData(p => ({ ...p, nom: e.target.value }))}
+                              className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                              placeholder="Nom complet" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Téléphone</label>
+                            <input type="tel" required
+                              value={formData.tel}
+                              onChange={e => setFormData(p => ({ ...p, tel: e.target.value }))}
+                              className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                              placeholder="+216 XX XXX XXX" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Message</label>
+                            <textarea rows={3} required
+                              value={formData.message}
+                              onChange={e => setFormData(p => ({ ...p, message: e.target.value }))}
+                              className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                              defaultValue={`Je suis intéressé(e) par "${property.title}". Pouvez-vous me recontacter ?`} />
+                          </div>
+                          <Button type="submit" className="w-full" disabled={sending}>
+                            {sending ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
+                            ) : "Envoyer"}
+                          </Button>
+                        </>
+                      )}
                     </form>
                   )}
                 </div>
@@ -314,13 +435,13 @@ export default function PropertyDetail() {
         </div>
       </section>
 
-      {/* Similar Properties */}
-      {similarProperties.length > 0 && (
+      {/* Biens similaires */}
+      {similar.length > 0 && (
         <section className="py-16 bg-muted">
           <div className="container-custom">
             <h2 className="section-title mb-8">Biens Similaires</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {similarProperties.map((p) => (
+              {similar.map((p: any) => (
                 <PropertyCard key={p.id} property={p} />
               ))}
             </div>

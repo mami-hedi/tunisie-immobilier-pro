@@ -71,10 +71,10 @@ export default function About() {
         <div className="container-custom">
           <div className="max-w-3xl">
             <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-              À Propos de Notre Agence
+              À Propos de nous
             </h1>
             <p className="text-muted-foreground text-lg">
-              Depuis 2023, Annonce Tunisie accompagne les Tunisiens et les étrangers dans leurs projets immobiliers avec passion, professionnalisme et engagement.
+              Depuis 2023, <b>Annonce Tunisie Tunisie </b>accompagne les Tunisiens et les étrangers dans leurs projets immobiliers avec passion, professionnalisme et engagement.
             </p>
           </div>
         </div>
@@ -90,17 +90,17 @@ export default function About() {
                 <span className="text-sm font-medium text-primary">Notre Histoire</span>
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold mb-6">
-                Une agence à taille humaine, des ambitions de leader
+                Une structure à taille humaine, des ambitions de leader
               </h2>
               <div className="space-y-4 text-muted-foreground leading-relaxed">
                 <p>
-                  Fondée en 2023 à Hammamet, Annonce Tunisie est née de la volonté de créer une agence immobilière différente, où la relation client prime sur le volume.
+                  Fondée en 2023 à Hammamet, Annonce Tunisie est née de la volonté de proposer une approche différente de l’immobilier, où la relation client passe avant tout.
                 </p>
                 <p>
-                  Notre équipe d’experts passionnés vous accompagne dans tous vos projets : achat, vente, location ou investissement. Nous couvrons l’ensemble du territoire tunisien, avec une expertise particulière sur le Grand Tunis, le Sahel et le Cap Bon.
+                  Une équipe d’experts passionnés vous accompagne dans tous vos projets : achat, vente, location ou investissement. La couverture s’étend sur l’ensemble du territoire tunisien, avec une expertise particulière sur le Grand Tunis, le Sahel et le Cap Bon.
                 </p>
                 <p>
-                  Notre philosophie est simple : comprendre vos besoins, vous conseiller avec honnêteté et vous accompagner jusqu’à la réalisation de votre projet.
+                  La philosophie est simple : comprendre vos besoins, vous conseiller avec transparence et vous accompagner jusqu’à la concrétisation de votre projet.
                 </p>
               </div>
             </div>
