@@ -10,7 +10,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173', 
     'http://localhost:8080', 
-    'https://tunisie-immobilier-pro.vercel.app/' // 🚩 REMPLACE PAR TON URL VERCEL
+    'https://tunisie-immobilier-pro.vercel.app' // 🚩 REMPLACE PAR TON URL VERCEL
   ],
   credentials: true
 }));
