@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, Check, Loader2,
 } from "lucide-react";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "https://tunisie-immobilier-pro.onrender.com";
 
 function formatPrice(price: number, transaction: string) {
   const formatted = new Intl.NumberFormat("fr-TN").format(price);

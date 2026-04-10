@@ -11,6 +11,9 @@ import { api } from "@/lib/api";
 
 // Adaptateur : convertit le format API → format PropertyCard
 function adaptAnnonce(a: any) {
+  // On définit l'URL de base : soit celle de Render, soit localhost en développement
+  const API_URL = "https://tunisie-immobilier-pro.onrender.com";
+
   return {
     id: String(a.id),
     title: a.titre,
@@ -25,8 +28,9 @@ function adaptAnnonce(a: any) {
     city: a.ville,
     address: a.adresse || '',
     description: a.description || '',
+    // ✅ On utilise API_URL au lieu de localhost:5000
     images: a.image_principale
-      ? [`http://localhost:5000${a.image_principale}`]
+      ? [`${API_URL}${a.image_principale}`]
       : ['/placeholder.svg'],
     features: [],
     contact: {
