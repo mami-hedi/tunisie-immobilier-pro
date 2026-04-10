@@ -257,4 +257,46 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
+// GET /api/annonces/admin/stats
+router.get('/admin/stats', auth, async (req, res) => {
+  try {
+    const [[total]]        = await db.query("SELECT COUNT(*) as v FROM annonces");
+    const [[actives]]      = await db.query("SELECT COUNT(*) as v FROM annonces WHERE statut='active'");
+    const [[en_attente]]   = await db.query("SELECT COUNT(*) as v FROM annonces WHERE statut='en_attente'");
+    const [[inactives]]    = await db.query("SELECT COUNT(*) as v FROM annonces WHERE statut='inactive'");
+    const [[ventes]]       = await db.query("SELECT COUNT(*) as v FROM annonces WHERE type_transaction='vente' AND statut='active'");
+    const [[locations]]    = await db.query("SELECT COUNT(*) as v FROM annonces WHERE type_transaction='location' AND statut='active'");
+    const [[prixMoyen]]    = await db.query("SELECT AVG(prix) as v FROM annonces WHERE statut='active'");
+
+    // Annonces par gouvernorat
+    const [parGouv] = await db.query(
+      `SELECT gouvernorat, COUNT(*) as total
+       FROM annonces WHERE statut='active'
+       GROUP BY gouvernorat ORDER BY total DESC LIMIT 5`
+    );
+
+    // Annonces des 6 derniers mois
+    const [parMois] = await db.query(
+      `SELECT DATE_FORMAT(created_at, '%Y-%m') as mois, COUNT(*) as total
+       FROM annonces
+       WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+       GROUP BY mois ORDER BY mois ASC`
+    );
+
+    res.json({
+      total: total.v,
+      actives: actives.v,
+      en_attente: en_attente.v,
+      inactives: inactives.v,
+      ventes: ventes.v,
+      locations: locations.v,
+      prix_moyen: Math.round(prixMoyen.v || 0),
+      par_gouvernorat: parGouv,
+      par_mois: parMois,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
 module.exports = router;

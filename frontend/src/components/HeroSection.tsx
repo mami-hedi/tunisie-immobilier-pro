@@ -30,7 +30,7 @@ export function HeroSection() {
 
           {/* Title */}
           <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-primary-foreground leading-tight">
-            Votre agence immobilière
+            Votre partenaire immobilier
             <br />
             <span className="text-primary">de confiance</span> en Tunisie
           </h1>

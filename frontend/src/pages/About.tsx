@@ -94,7 +94,7 @@ export default function About() {
               </h2>
               <div className="space-y-4 text-muted-foreground leading-relaxed">
                 <p>
-                  Fondée en 2023 à Hammamet, Annonce Tunisie est née de la volonté de proposer une approche différente de l’immobilier, où la relation client passe avant tout.
+                  Fondée en 2023 à Hammamet,<b>Annonce Tunisie Tunisie </b> est née de la volonté de proposer une approche différente de l’immobilier, où la relation client passe avant tout.
                 </p>
                 <p>
                   Une équipe d’experts passionnés vous accompagne dans tous vos projets : achat, vente, location ou investissement. La couverture s’étend sur l’ensemble du territoire tunisien, avec une expertise particulière sur le Grand Tunis, le Sahel et le Cap Bon.

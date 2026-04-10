@@ -42,23 +42,13 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               <a
-                href="#"
+                href="https://www.facebook.com/profile.php?id=61552025910201"
+                target="_blank"
                 className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
               >
                 <Facebook className="h-5 w-5" />
               </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
-              >
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
-              >
-                <Linkedin className="h-5 w-5" />
-              </a>
+             
             </div>
           </div>
 
@@ -86,7 +76,7 @@ export function Footer() {
               {footerLinks.services.map((link) => (
                 <li key={link.name}>
                   <Link
-                    to={link.href}
+                    
                     className="text-secondary-foreground/70 hover:text-primary transition-colors"
                   >
                     {link.name}
@@ -103,8 +93,8 @@ export function Footer() {
               <li className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <span className="text-secondary-foreground/70">
-                  123 Avenue Habib Bourguiba<br />
-                  1001 Tunis, Tunisie
+                  Avenue kuweit Hammamet<br />
+                  8050 Hammamet , Tunisie
                 </span>
               </li>
               <li>
@@ -113,7 +103,7 @@ export function Footer() {
                   className="flex items-center gap-3 text-secondary-foreground/70 hover:text-primary transition-colors"
                 >
                   <Phone className="h-5 w-5 text-primary" />
-                  +216 71 000 000
+                  +216 20 007 193
                 </a>
               </li>
               <li>
@@ -122,7 +112,7 @@ export function Footer() {
                   className="flex items-center gap-3 text-secondary-foreground/70 hover:text-primary transition-colors"
                 >
                   <Mail className="h-5 w-5 text-primary" />
-                  contact@annoncetunisie.tn
+                  contact@annonce-tunisie-tunisie.com
                 </a>
               </li>
             </ul>
@@ -131,21 +121,32 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-secondary-foreground/50 text-sm">
-            © {new Date().getFullYear()} Annonce Tunisie. Tous droits réservés.
-          </p>
-          <div className="flex gap-6">
-            {footerLinks.legal.map((link) => (
-              <Link
-                key={link.name}
-                to={link.href}
-                className="text-secondary-foreground/50 hover:text-primary text-sm transition-colors"
-              >
-                {link.name}
-              </Link>
-            ))}
-          </div>
-        </div>
+  <p className="text-secondary-foreground/50 text-sm">
+    © {new Date().getFullYear()} Annonce Tunisie Tunisie. Tous droits réservés. 
+    <br />
+    Créé par{" "}
+    <a
+      href="https://www.mh-digital-solution.com/"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:text-primary underline"
+    >
+      MH Digital Solution
+    </a>
+  </p>
+
+  <div className="flex gap-6">
+    {footerLinks.legal.map((link) => (
+      <Link
+        key={link.name}
+        to={link.href}
+        className="text-secondary-foreground/50 hover:text-primary text-sm transition-colors"
+      >
+        {link.name}
+      </Link>
+    ))}
+  </div>
+</div>
       </div>
     </footer>
   );

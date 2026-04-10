@@ -236,17 +236,7 @@ export default function Contact() {
       </section>
 
       {/* Map Section (placeholder) */}
-      <section className="h-[400px] bg-muted relative">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <MapPin className="h-12 w-12 text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">
-              Carte Google Maps<br />
-              123 Avenue Habib Bourguiba, Tunis
-            </p>
-          </div>
-        </div>
-      </section>
+      
     </Layout>
   );
 }

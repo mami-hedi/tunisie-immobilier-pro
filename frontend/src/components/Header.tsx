@@ -47,15 +47,15 @@ export function Header() {
             <div className="flex items-center gap-6">
               <a href="tel:+21671000000" className="flex items-center gap-2 hover:text-primary transition-colors">
                 <Phone className="h-4 w-4" />
-                <span>+216 71 000 000</span>
+                <span>+216 20 007 193</span>
               </a>
               <a href="mailto:contact@annoncetunisie.tn" className="flex items-center gap-2 hover:text-primary transition-colors">
                 <Mail className="h-4 w-4" />
-                <span>contact@annoncetunisie.tn</span>
+                <span>contact@annonce-tunisie-tunisie.com</span>
               </a>
             </div>
             <div className="text-secondary-foreground/70">
-              Votre agence immobilière de confiance
+              Votre accompagnateur immobilier de confiance
             </div>
           </div>
         </div>

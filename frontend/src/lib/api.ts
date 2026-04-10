@@ -1,7 +1,7 @@
 // src/lib/api.ts
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function getToken() {
+function getToken(): string | null {
   return localStorage.getItem('immo_token');
 }
 
@@ -21,32 +21,59 @@ async function request(endpoint: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  // Auth
+  // ── Auth ──────────────────────────────────────────────
   login: (email: string, password: string) =>
-    request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
 
-  // Annonces publiques
+  changePassword: (ancien: string, nouveau: string) =>
+    request('/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ ancien, nouveau }),
+    }),
+
+  // ── Annonces publiques ────────────────────────────────
   getAnnonces: (params: Record<string, string | number> = {}) => {
     const qs = new URLSearchParams(params as any).toString();
     return request(`/annonces?${qs}`);
   },
-  getAnnonce: (id: number) => request(`/annonces/${id}`),
 
-  // Admin
-  getAnnoncesAdmin: (params = {}) => {
+  getAnnonce: (id: number) =>
+    request(`/annonces/${id}`),
+
+  // ── Admin ─────────────────────────────────────────────
+  getAnnoncesAdmin: (params: Record<string, string | number> = {}) => {
     const qs = new URLSearchParams(params as any).toString();
     return request(`/annonces/admin/all?${qs}`);
   },
+
+  getStats: () =>
+    request('/annonces/admin/stats'),
+
   createAnnonce: (data: any) =>
-    request('/annonces', { method: 'POST', body: JSON.stringify(data) }),
+    request('/annonces', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   updateAnnonce: (id: number, data: any) =>
-    request(`/annonces/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request(`/annonces/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   updateStatut: (id: number, statut: string) =>
-    request(`/annonces/${id}/statut`, { method: 'PATCH', body: JSON.stringify({ statut }) }),
+    request(`/annonces/${id}/statut`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statut }),
+    }),
+
   deleteAnnonce: (id: number) =>
     request(`/annonces/${id}`, { method: 'DELETE' }),
 
-  // Upload images
+  // ── Upload images ─────────────────────────────────────
   uploadImages: async (files: File[]) => {
     const formData = new FormData();
     files.forEach(f => formData.append('images', f));
@@ -56,6 +83,8 @@ export const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Erreur upload');
+    return data;
   },
 };
