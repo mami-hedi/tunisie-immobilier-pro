@@ -7,7 +7,7 @@ import { PropertyCard } from "@/components/PropertyCard";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "https://tunisie-immobilier-pro.onrender.com";
 
 const features = [
   {
