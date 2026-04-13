@@ -136,7 +136,7 @@ export default function Properties() {
       </section>
 
       {/* Search & Filters */}
-      <section className="py-8 bg-background border-b border-border sticky top-[72px] z-40">
+      <section className="py-8 bg-background border-b border-border">
         <div className="container-custom">
           <SearchBar variant="page" />
         </div>
