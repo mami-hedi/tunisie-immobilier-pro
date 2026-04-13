@@ -33,7 +33,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ ancien, nouveau }),
     }),
-
+  getAnnonceBySlug: (slug: string) =>
+  request(`/annonces/slug/${slug}`),
   // ── Annonces publiques ────────────────────────────────
   getAnnonces: (params: Record<string, string | number> = {}) => {
     const qs = new URLSearchParams(params as any).toString();

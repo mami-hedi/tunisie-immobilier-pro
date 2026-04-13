@@ -29,7 +29,7 @@ const App = () => (
           {/* ── Pages publiques ── */}
           <Route path="/" element={<Index />} />
           <Route path="/biens" element={<Properties />} />
-          <Route path="/bien/:id" element={<PropertyDetail />} />
+          <Route path="/bien/:slug" element={<PropertyDetail />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/a-propos" element={<About />} />
           <Route path="/mentions-legales" element={<LegalNotice />} />

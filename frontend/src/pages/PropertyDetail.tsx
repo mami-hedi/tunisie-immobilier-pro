@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,21 +8,20 @@ import { api } from "@/lib/api";
 import {
   ArrowLeft, MapPin, Maximize, BedDouble, Bath,
   Phone, MessageCircle, Mail, Share2, Heart,
-  ChevronLeft, ChevronRight, Check, Loader2,
+  ChevronLeft, ChevronRight, Check, Loader2, Eye,
 } from "lucide-react";
 
 const BASE_URL = "https://tunisie-immobilier-pro.onrender.com";
 
 function formatPrice(price: number, transaction: string) {
   const formatted = new Intl.NumberFormat("fr-TN").format(price);
-  return transaction === "location"
-    ? `${formatted} DT / mois`
-    : `${formatted} DT`;
+  return transaction === "location" ? `${formatted} DT / mois` : `${formatted} DT`;
 }
 
 function adaptAnnonce(a: any) {
   return {
     id: String(a.id),
+    slug: a.slug || String(a.id),
     title: a.titre,
     price: Number(a.prix),
     type: a.type_bien,
@@ -39,6 +38,7 @@ function adaptAnnonce(a: any) {
       ? a.images.map((img: any) => `${BASE_URL}${img.url}`)
       : ["/placeholder.svg"],
     features: a.features || [],
+    nb_vues: Number(a.nb_vues) || 0,
     contact: {
       name: a.nom_contact || "",
       phone: a.tel_contact || "",
@@ -51,6 +51,7 @@ function adaptAnnonce(a: any) {
 function adaptAnnonceSimple(a: any) {
   return {
     id: String(a.id),
+    slug: a.slug || String(a.id),
     title: a.titre,
     price: Number(a.prix),
     type: a.type_bien,
@@ -63,9 +64,7 @@ function adaptAnnonceSimple(a: any) {
     city: a.ville,
     address: a.adresse || "",
     description: a.description || "",
-    images: a.image_principale
-      ? [`${BASE_URL}${a.image_principale}`]
-      : ["/placeholder.svg"],
+    images: a.image_principale ? [`${BASE_URL}${a.image_principale}`] : ["/placeholder.svg"],
     features: [],
     contact: { name: a.nom_contact || "", phone: a.tel_contact || "", email: a.email_contact || "" },
     createdAt: a.created_at,
@@ -74,36 +73,51 @@ function adaptAnnonceSimple(a: any) {
 }
 
 export default function PropertyDetail() {
-  const { id } = useParams<{ id: string }>();
-  const [property, setProperty]         = useState<any>(null);
-  const [similar, setSimilar]           = useState<any[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState("");
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+
+  const [property, setProperty]                   = useState<any>(null);
+  const [similar, setSimilar]                     = useState<any[]>([]);
+  const [loading, setLoading]                     = useState(true);
+  const [error, setError]                         = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactForm, setShowContactForm]     = useState(false);
   const [formData, setFormData] = useState({ nom: "", tel: "", message: "" });
   const [sending, setSending]   = useState(false);
   const [sent, setSent]         = useState(false);
+  const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!slug) return;
     setLoading(true);
     setError("");
     setCurrentImageIndex(0);
+    setSent(false);
+    setShowContactForm(false);
 
-    api.getAnnonce(Number(id))
+    // Essayer d'abord par slug, puis par id en fallback
+    const fetchFn = isNaN(Number(slug))
+      ? api.getAnnonceBySlug(slug)
+      : api.getAnnonce(Number(slug));
+
+    fetchFn
       .then((data: any) => {
+        // Rediriger vers le slug propre si on est arrivé par l'id
+        if (!isNaN(Number(slug)) && data.slug && data.slug !== slug) {
+          navigate(`/bien/${data.slug}`, { replace: true });
+          return;
+        }
         const adapted = adaptAnnonce(data);
         setProperty(adapted);
 
-        // Charger les biens similaires (même type_bien)
+        // Biens similaires
         return api.getAnnonces({
           type_bien: data.type_bien,
           statut: "active",
           limit: 4,
         }).then((res: any) => {
           const others = (res.annonces || [])
-            .filter((a: any) => String(a.id) !== String(id))
+            .filter((a: any) => String(a.id) !== String(data.id))
             .slice(0, 3)
             .map(adaptAnnonceSimple);
           setSimilar(others);
@@ -111,7 +125,7 @@ export default function PropertyDetail() {
       })
       .catch(() => setError("Ce bien n'existe pas ou a été retiré."))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [slug]);
 
   const nextImage = () =>
     setCurrentImageIndex(p => (p + 1) % property.images.length);
@@ -121,9 +135,9 @@ export default function PropertyDetail() {
   const handleWhatsApp = () => {
     const phone = property.contact?.phone || "+21658146177";
     const msg = encodeURIComponent(
-      `Bonjour, je suis intéressé(e) par le bien "${property.title}" (Réf: ${property.id}) à ${property.city}. Pouvez-vous me donner plus d'informations ?`
+      `Bonjour, je suis intéressé(e) par le bien "${property.title}" à ${property.city}. Pouvez-vous me donner plus d'informations ? ${window.location.href}`
     );
-    window.open(`https://wa.me/${phone.replace(/\s+/g, "")}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   };
 
   const handleCall = () => {
@@ -131,24 +145,25 @@ export default function PropertyDetail() {
     window.open(`tel:${phone}`, "_self");
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (navigator.share) {
-      navigator.share({ title: property.title, url: window.location.href });
+      await navigator.share({ title: property.title, url: window.location.href });
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
-    // Simulation envoi (à connecter à une vraie route email si besoin)
     await new Promise(r => setTimeout(r, 1000));
     setSent(true);
     setSending(false);
   };
 
-  // ── États de chargement / erreur ──────────────────────
+  // ── Loading ──
   if (loading) return (
     <Layout>
       <div className="min-h-[60vh] flex items-center justify-center pt-24">
@@ -160,6 +175,7 @@ export default function PropertyDetail() {
     </Layout>
   );
 
+  // ── Erreur ──
   if (error || !property) return (
     <Layout>
       <div className="min-h-[60vh] flex items-center justify-center pt-24">
@@ -169,9 +185,7 @@ export default function PropertyDetail() {
             {error || "Ce bien n'existe pas ou a été retiré de notre catalogue."}
           </p>
           <Button asChild>
-            <Link to="/biens">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Retour aux biens
-            </Link>
+            <Link to="/biens"><ArrowLeft className="mr-2 h-4 w-4" /> Retour aux biens</Link>
           </Button>
         </div>
       </div>
@@ -183,7 +197,7 @@ export default function PropertyDetail() {
       {/* Breadcrumb */}
       <section className="pt-28 pb-4 bg-muted">
         <div className="container-custom">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Accueil</Link>
             <span>/</span>
             <Link to="/biens" className="hover:text-primary transition-colors">Nos Biens</Link>
@@ -193,7 +207,7 @@ export default function PropertyDetail() {
         </div>
       </section>
 
-      {/* Main Content */}
+      {/* Main */}
       <section className="py-8 bg-background">
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -206,7 +220,7 @@ export default function PropertyDetail() {
                 <img
                   src={property.images[currentImageIndex]}
                   alt={property.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-opacity duration-300"
                   onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                 />
 
@@ -223,6 +237,7 @@ export default function PropertyDetail() {
                   </>
                 )}
 
+                {/* Badge transaction */}
                 <div className="absolute top-4 left-4 flex gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white
                     ${property.transactionType === "vente" ? "bg-blue-600" : "bg-green-600"}`}>
@@ -230,14 +245,26 @@ export default function PropertyDetail() {
                   </span>
                 </div>
 
+                {/* Actions */}
                 <div className="absolute top-4 right-4 flex gap-2">
-                  <button onClick={handleShare}
-                    className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
+                  <button onClick={handleShare} title={copied ? "Lien copié !" : "Partager"}
+                    className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors relative">
                     <Share2 className="h-5 w-5" />
+                    {copied && (
+                      <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        Copié !
+                      </span>
+                    )}
                   </button>
                   <button className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center hover:bg-background transition-colors">
                     <Heart className="h-5 w-5" />
                   </button>
+                </div>
+
+                {/* Compteur */}
+                <div className="absolute bottom-4 left-4 bg-background/90 px-3 py-1 rounded-full text-xs flex items-center gap-1 text-muted-foreground">
+                  <Eye className="h-3 w-3" />
+                  {property.nb_vues} vue{property.nb_vues > 1 ? 's' : ''}
                 </div>
 
                 <div className="absolute bottom-4 right-4 bg-background/90 px-3 py-1 rounded-full text-sm">
@@ -251,7 +278,7 @@ export default function PropertyDetail() {
                   {property.images.map((img: string, i: number) => (
                     <button key={i} onClick={() => setCurrentImageIndex(i)}
                       className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition
-                        ${i === currentImageIndex ? "border-primary" : "border-transparent"}`}>
+                        ${i === currentImageIndex ? "border-primary" : "border-transparent opacity-70 hover:opacity-100"}`}>
                       <img src={img} alt="" className="w-full h-full object-cover"
                         onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                     </button>
@@ -264,6 +291,9 @@ export default function PropertyDetail() {
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <Badge variant="secondary" className="text-sm capitalize">{property.type}</Badge>
                   <span className="text-muted-foreground text-sm">Réf: {property.id}</span>
+                  <span className="text-muted-foreground text-sm">
+                    Publié le {new Date(property.createdAt).toLocaleDateString('fr-TN')}
+                  </span>
                 </div>
 
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -271,11 +301,8 @@ export default function PropertyDetail() {
                 </h1>
 
                 <div className="flex items-center gap-2 text-muted-foreground mb-6">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <span>
-                    {[property.address, property.city, property.governorate]
-                      .filter(Boolean).join(", ")}
-                  </span>
+                  <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span>{[property.address, property.city, property.governorate].filter(Boolean).join(", ")}</span>
                 </div>
 
                 {/* Stats clés */}
@@ -337,7 +364,7 @@ export default function PropertyDetail() {
               </div>
             </div>
 
-            {/* ── Colonne droite — Contact ── */}
+            {/* ── Colonne droite ── */}
             <div className="lg:col-span-1">
               <div className="sticky top-28">
                 <div className="bg-card border border-border rounded-2xl p-6 shadow-card">
@@ -350,7 +377,7 @@ export default function PropertyDetail() {
                     </div>
                   </div>
 
-                  {/* Contact vendeur */}
+                  {/* Contact */}
                   {property.contact?.name && (
                     <div className="mb-6 pb-6 border-b border-border">
                       <div className="flex items-center gap-3">
@@ -361,9 +388,7 @@ export default function PropertyDetail() {
                         </div>
                         <div>
                           <div className="font-semibold">{property.contact.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {property.contact.phone}
-                          </div>
+                          <div className="text-sm text-muted-foreground">{property.contact.phone}</div>
                         </div>
                       </div>
                     </div>
@@ -383,7 +408,7 @@ export default function PropertyDetail() {
                     </Button>
                   </div>
 
-                  {/* Formulaire contact */}
+                  {/* Formulaire */}
                   {showContactForm && (
                     <form onSubmit={handleSendMessage}
                       className="mt-6 pt-6 border-t border-border space-y-4">
@@ -397,32 +422,29 @@ export default function PropertyDetail() {
                         <>
                           <div>
                             <label className="block text-sm font-medium mb-2">Votre nom</label>
-                            <input type="text" required
-                              value={formData.nom}
+                            <input type="text" required value={formData.nom}
                               onChange={e => setFormData(p => ({ ...p, nom: e.target.value }))}
                               className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="Nom complet" />
                           </div>
                           <div>
                             <label className="block text-sm font-medium mb-2">Téléphone</label>
-                            <input type="tel" required
-                              value={formData.tel}
+                            <input type="tel" required value={formData.tel}
                               onChange={e => setFormData(p => ({ ...p, tel: e.target.value }))}
                               className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="+216 XX XXX XXX" />
                           </div>
                           <div>
                             <label className="block text-sm font-medium mb-2">Message</label>
-                            <textarea rows={3} required
-                              value={formData.message}
+                            <textarea rows={3} required value={formData.message}
                               onChange={e => setFormData(p => ({ ...p, message: e.target.value }))}
                               className="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                              defaultValue={`Je suis intéressé(e) par "${property.title}". Pouvez-vous me recontacter ?`} />
+                              placeholder={`Je suis intéressé(e) par "${property.title}". Pouvez-vous me recontacter ?`} />
                           </div>
                           <Button type="submit" className="w-full" disabled={sending}>
-                            {sending ? (
-                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
-                            ) : "Envoyer"}
+                            {sending
+                              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
+                              : "Envoyer"}
                           </Button>
                         </>
                       )}

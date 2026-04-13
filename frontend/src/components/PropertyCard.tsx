@@ -80,7 +80,7 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
 
         {/* CTA */}
         <Button asChild variant="ghost" className="w-full justify-between group/btn hover:bg-primary hover:text-primary-foreground">
-          <Link to={`/bien/${property.id}`}>
+          <Link to={`/bien/${property.slug || property.id}`}>
             <span>Voir le bien</span>
             <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
           </Link>
