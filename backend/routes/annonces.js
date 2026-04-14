@@ -29,6 +29,19 @@ async function columnExists(table, column) {
   } catch { return false; }
 }
 
+// ─── UTILITAIRE DE NETTOYAGE DES DONNÉES ────────────────
+// Transforme les "" en null pour les colonnes numériques
+const cleanData = (data) => {
+  const fields = ['prix', 'surface', 'nb_pieces', 'nb_chambres', 'nb_salles_bain', 'latitude', 'longitude'];
+  const cleaned = { ...data };
+  fields.forEach(field => {
+    if (cleaned[field] === "" || cleaned[field] === undefined) {
+      cleaned[field] = null;
+    }
+  });
+  return cleaned;
+};
+
 // ─── PUBLIC ────────────────────────────────────────────
 
 router.get('/', async (req, res) => {
@@ -87,8 +100,6 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
-
-// ⚠️ Routes statiques AVANT /:id
 
 router.get('/admin/all', auth, async (req, res) => {
   try {
@@ -186,7 +197,6 @@ router.get('/slug/:slug', async (req, res) => {
       [annonce.id]
     );
 
-    // Incrémenter nb_vues si la colonne existe
     const hasVues = await columnExists('annonces', 'nb_vues');
     if (hasVues) {
       await db.query('UPDATE annonces SET nb_vues = nb_vues + 1 WHERE id = ?', [annonce.id]);
@@ -226,13 +236,16 @@ router.post('/', auth, async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    
+    // Nettoyage des données numériques
+    const data = cleanData(req.body);
     const {
       titre, description, type_bien, type_transaction, prix,
       surface, nb_pieces, nb_chambres, nb_salles_bain,
       gouvernorat, ville, adresse, latitude, longitude,
       nom_contact, tel_contact, email_contact,
       statut = 'active', images = [], features = []
-    } = req.body;
+    } = data;
 
     const [result] = await conn.query(
       `INSERT INTO annonces
@@ -246,8 +259,6 @@ router.post('/', auth, async (req, res) => {
     );
 
     const annonceId = result.insertId;
-
-    // Générer slug si la colonne existe
     const hasSlug = await columnExists('annonces', 'slug');
     const slug = slugify(titre) + '-' + annonceId;
     if (hasSlug) {
@@ -278,20 +289,21 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// ✅ PUT corrigé — slug optionnel selon existence colonne
 router.put('/:id', auth, async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+
+    // Nettoyage des données numériques (Correction de l'erreur Incorrect integer value: '')
+    const data = cleanData(req.body);
     const {
       titre, description, type_bien, type_transaction, prix,
       surface, nb_pieces, nb_chambres, nb_salles_bain,
       gouvernorat, ville, adresse, latitude, longitude,
       nom_contact, tel_contact, email_contact, statut,
       images = [], features = []
-    } = req.body;
+    } = data;
 
-    // Vérifier si la colonne slug existe avant de l'inclure dans le UPDATE
     const hasSlug = await columnExists('annonces', 'slug');
     const slug = slugify(titre) + '-' + req.params.id;
 
