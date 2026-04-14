@@ -15,8 +15,9 @@ CREATE TABLE admins (
 CREATE TABLE annonces (
   id INT AUTO_INCREMENT PRIMARY KEY,
   titre VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) UNIQUE, -- La colonne indispensable pour le SEO
   description TEXT,
-  type_bien ENUM('appartement','maison','villa','terrain','local','bureau') NOT NULL,
+  type_bien ENUM('appartement','maison','villa','terrain','local','bureau','studio') NOT NULL, -- Ajout de 'studio'
   type_transaction ENUM('vente','location') NOT NULL,
   prix DECIMAL(12,2) NOT NULL,
   surface DECIMAL(8,2),
@@ -32,10 +33,10 @@ CREATE TABLE annonces (
   tel_contact VARCHAR(20),
   email_contact VARCHAR(150),
   statut ENUM('active','inactive','en_attente') DEFAULT 'en_attente',
+  nb_vues INT DEFAULT 0, -- Optionnel : pour vos stats
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
 -- Table des images des annonces
 CREATE TABLE annonce_images (
   id INT AUTO_INCREMENT PRIMARY KEY,
