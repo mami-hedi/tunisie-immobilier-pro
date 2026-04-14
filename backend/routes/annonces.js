@@ -17,9 +17,20 @@ function slugify(text) {
     .replace(/-+/g, '-');
 }
 
+// Vérifie si une colonne existe dans la table
+async function columnExists(table, column) {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [table, column]
+    );
+    return rows[0].cnt > 0;
+  } catch { return false; }
+}
+
 // ─── PUBLIC ────────────────────────────────────────────
 
-// GET /api/annonces — liste avec filtres + tri
 router.get('/', async (req, res) => {
   try {
     const {
@@ -35,10 +46,10 @@ router.get('/', async (req, res) => {
     if (type_bien)        { where.push('a.type_bien = ?');        params.push(type_bien); }
     if (type_transaction) { where.push('a.type_transaction = ?'); params.push(type_transaction); }
     if (gouvernorat)      { where.push('a.gouvernorat = ?');      params.push(gouvernorat); }
-    if (prix_min)         { where.push('a.prix >= ?');             params.push(prix_min); }
-    if (prix_max)         { where.push('a.prix <= ?');             params.push(prix_max); }
-    if (surface_min)      { where.push('a.surface >= ?');          params.push(surface_min); }
-    if (nb_pieces)        { where.push('a.nb_pieces >= ?');        params.push(nb_pieces); }
+    if (prix_min)         { where.push('a.prix >= ?');            params.push(prix_min); }
+    if (prix_max)         { where.push('a.prix <= ?');            params.push(prix_max); }
+    if (surface_min)      { where.push('a.surface >= ?');         params.push(surface_min); }
+    if (nb_pieces)        { where.push('a.nb_pieces >= ?');       params.push(nb_pieces); }
     if (search) {
       where.push('(a.titre LIKE ? OR a.description LIKE ? OR a.ville LIKE ?)');
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -50,11 +61,10 @@ router.get('/', async (req, res) => {
     const sortOrder = allowedOrder.includes(order?.toUpperCase()) ? order.toUpperCase() : 'DESC';
 
     const limitVal = parseInt(limit) || 12;
-    const pageVal = parseInt(page) || 1;
-    const offset = (pageVal - 1) * limitVal;
+    const pageVal  = parseInt(page)  || 1;
+    const offset   = (pageVal - 1) * limitVal;
     const whereClause = where.join(' AND ');
 
-    // 1. Récupérer les annonces
     const sql = `
       SELECT a.*,
         (SELECT url FROM annonce_images
@@ -64,32 +74,22 @@ router.get('/', async (req, res) => {
       ORDER BY a.${sortField} ${sortOrder}
       LIMIT ? OFFSET ?
     `;
-    
-    const [annonces] = await db.query(sql, [...params, limitVal, offset]);
 
-    // 2. Récupérer le total (Correction de la déstructuration)
+    const [annonces] = await db.query(sql, [...params, limitVal, offset]);
     const [countRows] = await db.query(
       `SELECT COUNT(*) as total FROM annonces a WHERE ${whereClause}`,
       params
     );
-    const total = countRows[0]?.total || 0;
 
-    res.json({ 
-      annonces, 
-      total, 
-      page: pageVal, 
-      limit: limitVal 
-    });
-
+    res.json({ annonces, total: countRows[0]?.total || 0, page: pageVal, limit: limitVal });
   } catch (err) {
     console.error("Erreur GET /api/annonces :", err);
-    res.status(500).json({ message: 'Erreur serveur lors de la récupération des annonces', error: err.message });
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
 
 // ⚠️ Routes statiques AVANT /:id
 
-// GET /api/annonces/admin/all
 router.get('/admin/all', auth, async (req, res) => {
   try {
     const { statut, page = 1, limit = 20, search } = req.query;
@@ -103,8 +103,8 @@ router.get('/admin/all', auth, async (req, res) => {
     }
 
     const limitVal = parseInt(limit) || 20;
-    const pageVal = parseInt(page) || 1;
-    const offset = (pageVal - 1) * limitVal;
+    const pageVal  = parseInt(page)  || 1;
+    const offset   = (pageVal - 1) * limitVal;
     const whereClause = where.join(' AND ');
 
     const [annonces] = await db.query(
@@ -130,7 +130,6 @@ router.get('/admin/all', auth, async (req, res) => {
   }
 });
 
-// GET /api/annonces/admin/stats
 router.get('/admin/stats', auth, async (req, res) => {
   try {
     const [total]      = await db.query("SELECT COUNT(*) as v FROM annonces");
@@ -155,12 +154,12 @@ router.get('/admin/stats', auth, async (req, res) => {
     );
 
     res.json({
-      total: total[0]?.v || 0,
-      actives: actives[0]?.v || 0,
+      total:      total[0]?.v      || 0,
+      actives:    actives[0]?.v    || 0,
       en_attente: en_attente[0]?.v || 0,
-      inactives: inactives[0]?.v || 0,
-      ventes: ventes[0]?.v || 0,
-      locations: locations[0]?.v || 0,
+      inactives:  inactives[0]?.v  || 0,
+      ventes:     ventes[0]?.v     || 0,
+      locations:  locations[0]?.v  || 0,
       prix_moyen: Math.round(prixMoyen[0]?.v || 0),
       par_gouvernorat: parGouv,
       par_mois: parMois,
@@ -171,7 +170,6 @@ router.get('/admin/stats', auth, async (req, res) => {
   }
 });
 
-// GET /api/annonces/slug/:slug — détail par slug
 router.get('/slug/:slug', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM annonces WHERE slug = ?', [req.params.slug]);
@@ -179,7 +177,7 @@ router.get('/slug/:slug', async (req, res) => {
       return res.status(404).json({ message: 'Annonce introuvable' });
 
     const annonce = rows[0];
-    const [images] = await db.query(
+    const [images]   = await db.query(
       'SELECT * FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC',
       [annonce.id]
     );
@@ -188,7 +186,11 @@ router.get('/slug/:slug', async (req, res) => {
       [annonce.id]
     );
 
-    await db.query('UPDATE annonces SET nb_vues = nb_vues + 1 WHERE id = ?', [annonce.id]);
+    // Incrémenter nb_vues si la colonne existe
+    const hasVues = await columnExists('annonces', 'nb_vues');
+    if (hasVues) {
+      await db.query('UPDATE annonces SET nb_vues = nb_vues + 1 WHERE id = ?', [annonce.id]);
+    }
 
     res.json({ ...annonce, images, features: features.map(f => f.feature) });
   } catch (err) {
@@ -196,7 +198,6 @@ router.get('/slug/:slug', async (req, res) => {
   }
 });
 
-// GET /api/annonces/:id — détail par id
 router.get('/:id', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM annonces WHERE id = ?', [req.params.id]);
@@ -204,7 +205,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Annonce introuvable' });
 
     const annonce = rows[0];
-    const [images] = await db.query(
+    const [images]   = await db.query(
       'SELECT * FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC',
       [annonce.id]
     );
@@ -245,8 +246,13 @@ router.post('/', auth, async (req, res) => {
     );
 
     const annonceId = result.insertId;
+
+    // Générer slug si la colonne existe
+    const hasSlug = await columnExists('annonces', 'slug');
     const slug = slugify(titre) + '-' + annonceId;
-    await conn.query('UPDATE annonces SET slug = ? WHERE id = ?', [slug, annonceId]);
+    if (hasSlug) {
+      await conn.query('UPDATE annonces SET slug = ? WHERE id = ?', [slug, annonceId]);
+    }
 
     for (let i = 0; i < images.length; i++) {
       await conn.query(
@@ -265,12 +271,14 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json({ message: 'Annonce créée', id: annonceId, slug });
   } catch (err) {
     await conn.rollback();
+    console.error("Erreur POST /annonces :", err);
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   } finally {
     conn.release();
   }
 });
 
+// ✅ PUT corrigé — slug optionnel selon existence colonne
 router.put('/:id', auth, async (req, res) => {
   const conn = await db.getConnection();
   try {
@@ -283,22 +291,43 @@ router.put('/:id', auth, async (req, res) => {
       images = [], features = []
     } = req.body;
 
+    // Vérifier si la colonne slug existe avant de l'inclure dans le UPDATE
+    const hasSlug = await columnExists('annonces', 'slug');
     const slug = slugify(titre) + '-' + req.params.id;
 
-    await conn.query(
-      `UPDATE annonces SET
+    let updateSQL;
+    let updateParams;
+
+    if (hasSlug) {
+      updateSQL = `UPDATE annonces SET
         titre=?, description=?, type_bien=?, type_transaction=?, prix=?,
         surface=?, nb_pieces=?, nb_chambres=?, nb_salles_bain=?, gouvernorat=?,
         ville=?, adresse=?, latitude=?, longitude=?, nom_contact=?,
         tel_contact=?, email_contact=?, statut=?, slug=?
-       WHERE id=?`,
-      [titre, description, type_bien, type_transaction, prix, surface,
-       nb_pieces, nb_chambres, nb_salles_bain, gouvernorat, ville, adresse,
-       latitude, longitude, nom_contact, tel_contact, email_contact,
-       statut, slug, req.params.id]
-    );
+       WHERE id=?`;
+      updateParams = [
+        titre, description, type_bien, type_transaction, prix, surface,
+        nb_pieces, nb_chambres, nb_salles_bain, gouvernorat, ville, adresse,
+        latitude, longitude, nom_contact, tel_contact, email_contact,
+        statut, slug, req.params.id
+      ];
+    } else {
+      updateSQL = `UPDATE annonces SET
+        titre=?, description=?, type_bien=?, type_transaction=?, prix=?,
+        surface=?, nb_pieces=?, nb_chambres=?, nb_salles_bain=?, gouvernorat=?,
+        ville=?, adresse=?, latitude=?, longitude=?, nom_contact=?,
+        tel_contact=?, email_contact=?, statut=?
+       WHERE id=?`;
+      updateParams = [
+        titre, description, type_bien, type_transaction, prix, surface,
+        nb_pieces, nb_chambres, nb_salles_bain, gouvernorat, ville, adresse,
+        latitude, longitude, nom_contact, tel_contact, email_contact,
+        statut, req.params.id
+      ];
+    }
 
-    await conn.query('DELETE FROM annonce_images WHERE annonce_id=?', [req.params.id]);
+    await conn.query(updateSQL, updateParams);
+    await conn.query('DELETE FROM annonce_images   WHERE annonce_id=?', [req.params.id]);
     await conn.query('DELETE FROM annonce_features WHERE annonce_id=?', [req.params.id]);
 
     for (let i = 0; i < images.length; i++) {
@@ -315,9 +344,10 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     await conn.commit();
-    res.json({ message: 'Annonce mise à jour', slug });
+    res.json({ message: 'Annonce mise à jour', slug: hasSlug ? slug : null });
   } catch (err) {
     await conn.rollback();
+    console.error("Erreur PUT /annonces/:id :", err);
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   } finally {
     conn.release();
