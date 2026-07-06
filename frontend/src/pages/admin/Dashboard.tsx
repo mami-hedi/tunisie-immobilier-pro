@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 const LIMITE = 15;
 
 const STATUT_COLORS: Record<string, string> = {
-  active:     'bg-green-100 text-green-700 border-green-200',
+  active:      'bg-green-100 text-green-700 border-green-200',
   en_attente: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   inactive:   'bg-gray-100 text-gray-500 border-gray-200',
 };
@@ -23,10 +23,15 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
 
   // ── Liste annonces ──
-  const [annonces, setAnnonces]       = useState<any[]>([]);
-  const [total, setTotal]             = useState(0);
-  const [page, setPage]               = useState(1);
+  const [annonces, setAnnonces]           = useState<any[]>([]);
+  const [total, setTotal]              = useState(0);
+  const [page, setPage]                = useState(1);
   const [filterStatut, setFilterStatut] = useState('');
+  const [filterTransaction, setFilterTransaction] = useState(''); 
+  
+  // ── AJOUT : État pour filtrer par type de bien ──
+  const [filterBien, setFilterBien]   = useState(''); 
+  
   const [search, setSearch]           = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [loadingList, setLoadingList] = useState(true);
@@ -50,8 +55,13 @@ export default function AdminDashboard() {
     setLoadingList(true);
     try {
       const params: any = { page: p, limit: LIMITE };
-      if (filterStatut) params.statut = filterStatut;
-      if (search)       params.search = search;
+      if (filterStatut)      params.statut = filterStatut;
+      if (filterTransaction) params.type_transaction = filterTransaction; 
+      
+      // ── AJOUT : Transmission du paramètre type_bien à l'API ──
+      if (filterBien)        params.type_bien = filterBien; 
+      
+      if (search)            params.search = search;
       const data = await api.getAnnoncesAdmin(params);
       setAnnonces(reset ? data.annonces : prev => [...prev, ...data.annonces]);
       setTotal(data.total);
@@ -62,10 +72,11 @@ export default function AdminDashboard() {
     }
   };
 
+  // ── MODIFICATION : Ajout de filterBien aux dépendances de rechargement ──
   useEffect(() => {
     setPage(1);
     loadAnnonces(1, true);
-  }, [filterStatut, search]);
+  }, [filterStatut, filterTransaction, filterBien, search]);
 
   // ── Actions ──
   const handleStatut = async (id: number, statut: string) => {
@@ -138,13 +149,13 @@ export default function AdminDashboard() {
             + Nouvelle annonce
           </Button>
           <Button 
-  variant="outline" 
-  size="sm" 
-  className="text-white border-red-500 bg-red-500 hover:bg-red-600 hover:border-red-600"
-  onClick={() => { logout(); navigate('/admin'); }}
->
-  Déconnexion
-</Button>
+            variant="outline" 
+            size="sm" 
+            className="text-white border-red-500 bg-red-500 hover:bg-red-600 hover:border-red-600"
+            onClick={() => { logout(); navigate('/admin'); }}
+          >
+            Déconnexion
+          </Button>
         </div>
       </header>
 
@@ -220,23 +231,52 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
 
             {/* Toolbar */}
-            <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-3 justify-between">
-              {/* Recherche */}
-              <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-sm">
-                <Input
-                  placeholder="Rechercher une annonce..."
-                  value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  className="text-sm"
-                />
-                <Button type="submit" size="sm">🔍</Button>
-                {search && (
-                  <Button type="button" size="sm" variant="ghost"
-                    onClick={() => { setSearch(''); setSearchInput(''); }}>
-                    ✕
-                  </Button>
-                )}
-              </form>
+            <div className="p-4 border-b border-gray-100 flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+              
+              <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full max-w-3xl">
+                {/* Recherche */}
+                <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-xs">
+                  <Input
+                    placeholder="Rechercher une annonce..."
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                    className="text-sm"
+                  />
+                  <Button type="submit" size="sm">🔍</Button>
+                  {search && (
+                    <Button type="button" size="sm" variant="ghost"
+                      onClick={() => { setSearch(''); setSearchInput(''); }}>
+                      ✕
+                    </Button>
+                  )}
+                </form>
+
+                {/* Filtre Transaction */}
+                <select
+                  value={filterTransaction}
+                  onChange={e => { setFilterTransaction(e.target.value); setPage(1); }}
+                  className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">🏷️ Toutes transactions</option>
+                  <option value="vente">🏷️ À Vendre</option>
+                  <option value="location">🔑 À Louer</option>
+                </select>
+
+                {/* ── AJOUT : Filtre Type de Bien ── */}
+                <select
+                  value={filterBien}
+                  onChange={e => { setFilterBien(e.target.value); setPage(1); }}
+                  className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">🏠 Tous les types de biens</option>
+                  <option value="appartement">🏢 Appartement</option>
+                  <option value="maison">🏡 Maison</option>
+                  <option value="villa">🏰 Villa</option>
+                  <option value="terrain">🌱 Terrain</option>
+                  <option value="local">🏪 Local</option>
+                  <option value="bureau">💼 Bureau</option>
+                </select>
+              </div>
 
               {/* Filtres statut */}
               <div className="flex gap-1 flex-wrap">

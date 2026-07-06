@@ -1,6 +1,25 @@
 import { Link } from "react-router-dom";
-import { Phone, Mail, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram } from "lucide-react";
 
+// TikTok n'existe pas dans lucide-react : icône maison au même style (stroke, 24x24)
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </svg>
+  );
+}
 
 const footerLinks = {
   navigation: [
@@ -15,10 +34,6 @@ const footerLinks = {
     { name: "Location", href: "/biens?type=Location" },
     { name: "Estimation gratuite", href: "/contact" },
     { name: "Conseils personnalisés", href: "/contact" },
-  ],
-  legal: [
-    { name: "Mentions légales", href: "/mentions-legales" },
-    { name: "Politique de confidentialité", href: "/mentions-legales" },
   ],
 };
 
@@ -44,11 +59,27 @@ export function Footer() {
               <a
                 href="https://www.facebook.com/profile.php?id=61552025910201"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
               >
                 <Facebook className="h-5 w-5" />
               </a>
-             
+              <a
+                href="https://www.instagram.com/annonce_tunisie_tunisie/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
+              >
+                <Instagram className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.tiktok.com/@annoncetunisietunisie"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-secondary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors"
+              >
+                <TikTokIcon className="h-5 w-5" />
+              </a>
             </div>
           </div>
 
@@ -93,8 +124,7 @@ export function Footer() {
               <li className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <span className="text-secondary-foreground/70">
-                  Avenue kuweit Hammamet<br />
-                  8050 Hammamet , Tunisie
+                  8050 Hammamet, Tunisie
                 </span>
               </li>
               <li>
@@ -120,7 +150,7 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex justify-center text-center">
   <p className="text-secondary-foreground/50 text-sm">
     © {new Date().getFullYear()} Annonce Tunisie Tunisie. Tous droits réservés. 
     <br />
@@ -134,18 +164,6 @@ export function Footer() {
       MH Digital Solution
     </a>
   </p>
-
-  <div className="flex gap-6">
-    {footerLinks.legal.map((link) => (
-      <Link
-        key={link.name}
-        to={link.href}
-        className="text-secondary-foreground/50 hover:text-primary text-sm transition-colors"
-      >
-        {link.name}
-      </Link>
-    ))}
-  </div>
 </div>
       </div>
     </footer>

@@ -38,9 +38,9 @@ export function Header() {
   return (
     <>
       <header
-        ref={headerRef}
-        className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-custom border-b border-border"
-      >
+  ref={headerRef}
+  className="bg-white border-b border-border"
+>
         {/* Top bar */}
         <div className="bg-secondary text-secondary-foreground py-2 hidden md:block">
           <div className="container-custom flex justify-between items-center text-sm">
@@ -146,7 +146,7 @@ export function Header() {
       </header>
 
       {/* Main content avec padding dynamique */}
-      <main style={{ paddingTop: `${headerHeight}px` }}>
+      <main>
         {/* Contenu de la page ici */}
       </main>
     </>

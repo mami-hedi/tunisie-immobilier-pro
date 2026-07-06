@@ -55,7 +55,7 @@ export default function Contact() {
     {
       icon: MapPin,
       title: "Adresse",
-      content: "8050 Avenue kuweit hammamet, Tunisie",
+      content: "8050 hammamet, Tunisie",
       link: null,
     },
     {

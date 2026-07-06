@@ -83,10 +83,13 @@ router.get('/', async (req, res) => {
     const sortField = allowedSort.includes(sort) ? sort : 'created_at';
     const sortOrder = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    const limitVal = parseInt(limit) || 12;
-    const offset = (parseInt(page) - 1) * limitVal;
+    // CORRECTION : On s'assure à 100% que ce sont des nombres entiers natifs
+    const limitVal = Math.max(1, parseInt(limit) || 12);
+    const offset = Math.max(0, (parseInt(page) - 1) * limitVal);
     const whereClause = where.join(' AND ');
 
+    // CORRECTION ALTERNATIVE : On injecte directement limitVal et offset dans le SQL 
+    // pour éviter les caprices des placeholders MySQL '?' avec les clauses LIMIT/OFFSET.
     const sql = `
       SELECT a.*, 
         (SELECT url FROM annonce_images 
@@ -94,16 +97,17 @@ router.get('/', async (req, res) => {
       FROM annonces a
       WHERE ${whereClause}
       ORDER BY a.${sortField} ${sortOrder}
-      LIMIT ? OFFSET ?
+      LIMIT ${limitVal} OFFSET ${offset}
     `;
 
-    const [annonces] = await db.query(sql, [...params, limitVal, offset]);
+    // On passe uniquement 'params' car LIMIT et OFFSET sont maintenant intégrés en toute sécurité (puisqu'on les a castés en Int)
+    const [annonces] = await db.query(sql, params);
     const [countRows] = await db.query(`SELECT COUNT(*) as total FROM annonces a WHERE ${whereClause}`, params);
 
     res.json({ 
       annonces, 
       total: countRows[0]?.total || 0, 
-      page: parseInt(page), 
+      page: parseInt(page) || 1, 
       limit: limitVal 
     });
   } catch (err) {
@@ -158,13 +162,35 @@ router.get('/:id', async (req, res) => {
 /**
  * GET /api/annonces/admin/all
  */
+/**
+ * GET /api/annonces/admin/all
+ */
+/**
+ * GET /api/annonces/admin/all
+ */
 router.get('/admin/all', auth, async (req, res) => {
   try {
-    const { statut, page = 1, limit = 20, search } = req.query;
+    // 1. AJOUT de type_bien ici dans la déstructuration
+    const { statut, type_transaction, type_bien, page = 1, limit = 20, search } = req.query;
     let where = ['1=1'];
     let params = [];
 
-    if (statut) { where.push('statut = ?'); params.push(statut); }
+    if (statut) { 
+      where.push('statut = ?'); 
+      params.push(statut); 
+    }
+    
+    if (type_transaction) { 
+      where.push('type_transaction = ?'); 
+      params.push(type_transaction); 
+    }
+
+    // 2. AJOUT de la condition SQL pour filtrer par type de bien
+    if (type_bien) {
+      where.push('type_bien = ?');
+      params.push(type_bien);
+    }
+    
     if (search) {
       where.push('(titre LIKE ? OR ville LIKE ? OR gouvernorat LIKE ?)');
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
