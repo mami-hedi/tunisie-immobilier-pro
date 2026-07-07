@@ -14,6 +14,11 @@ function adaptAnnonce(a: any) {
   // On définit l'URL de base : soit celle de Render, soit localhost en développement
   const API_URL = "https://tunisie-immobilier-pro.onrender.com";
 
+  // Cloudinary renvoie déjà une URL https complète (ex: https://res.cloudinary.com/...).
+  // On ne préfixe que les anciennes images encore stockées localement (ex: /uploads/xxx.jpg).
+  const resolveImageUrl = (url: string) =>
+    url.startsWith('http') ? url : `${API_URL}${url}`;
+
   return {
     id: String(a.id),
     title: a.titre,
@@ -28,9 +33,8 @@ function adaptAnnonce(a: any) {
     city: a.ville,
     address: a.adresse || '',
     description: a.description || '',
-    // ✅ On utilise API_URL au lieu de localhost:5000
     images: a.image_principale
-      ? [`${API_URL}${a.image_principale}`]
+      ? [resolveImageUrl(a.image_principale)]
       : ['/placeholder.svg'],
     features: [],
     contact: {
