@@ -6,11 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
-// ✅ URL dynamique selon l'environnement
-const BASE_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace('/api', '')
-  : 'http://localhost:5000';
-
 const GOUVERNORATS = [
   'Tunis','Ariana','Ben Arous','Manouba','Nabeul','Zaghouan','Bizerte',
   'Béja','Jendouba','Kef','Siliana','Sousse','Monastir','Mahdia',
@@ -33,6 +28,12 @@ const defaultForm = {
   statut: 'active',
 };
 
+// Image déjà uploadée sur Cloudinary (existante en base ou juste uploadée)
+interface AnnonceImage {
+  url: string;
+  publicId: string;
+}
+
 export default function AnnonceForm() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -41,7 +42,7 @@ export default function AnnonceForm() {
 
   const [form, setForm]               = useState(defaultForm);
   const [features, setFeatures]       = useState<string[]>([]);
-  const [images, setImages]           = useState<string[]>([]);
+  const [images, setImages]           = useState<AnnonceImage[]>([]);
   const [files, setFiles]             = useState<File[]>([]);
   const [previews, setPreviews]       = useState<string[]>([]);
   const [loading, setLoading]         = useState(false);
@@ -71,7 +72,10 @@ export default function AnnonceForm() {
           statut:         rest.statut         || 'active',
         });
         setFeatures(feats || []);
-        setImages(imgs?.map((i: any) => i.url) || []);
+        // L'API renvoie déjà { url, publicId } par image (colonnes url + public_id)
+        setImages(
+          (imgs || []).map((i: any) => ({ url: i.url, publicId: i.publicId }))
+        );
       })
       .catch(() => toast.error('Annonce introuvable'))
       .finally(() => setLoadingData(false));
@@ -95,12 +99,24 @@ export default function AnnonceForm() {
     setPreviews(prev => [...prev, ...selected.map(f => URL.createObjectURL(f))]);
   };
 
-  const removeNewImage      = (i: number) => {
+  const removeNewImage = (i: number) => {
     setFiles(prev => prev.filter((_, idx) => idx !== i));
     setPreviews(prev => prev.filter((_, idx) => idx !== i));
   };
-  const removeExistingImage = (i: number) =>
+
+  // Supprime l'image sur Cloudinary puis la retire du state
+  const removeExistingImage = async (i: number) => {
+    const img = images[i];
     setImages(prev => prev.filter((_, idx) => idx !== i));
+    if (img?.publicId) {
+      try {
+        await api.deleteImage(img.publicId);
+      } catch {
+        // on ne bloque pas l'utilisateur si la suppression CDN échoue ;
+        // l'image restera simplement orpheline sur Cloudinary
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,16 +126,19 @@ export default function AnnonceForm() {
     }
     setLoading(true);
     try {
-      let uploadedUrls: string[] = [];
+      let uploadedImages: AnnonceImage[] = [];
       if (files.length > 0) {
-        const result = await api.uploadImages(files);
-        uploadedUrls = result.urls || [];
+        const result = await api.uploadImages(files); // { urls, publicIds }
+        uploadedImages = result.urls.map((url: string, idx: number) => ({
+          url,
+          publicId: result.publicIds[idx],
+        }));
       }
 
       const payload = {
         ...form,
         features,
-        images: [...images, ...uploadedUrls],
+        images: [...images, ...uploadedImages], // [{url, publicId}, ...]
       };
 
       if (isEdit) {
@@ -304,15 +323,15 @@ export default function AnnonceForm() {
 
         {/* Photos */}
         <Section title="📸 Photos">
-          {/* ✅ Images existantes avec BASE_URL dynamique */}
+          {/* Images existantes : URLs Cloudinary complètes, aucun préfixe à ajouter */}
           {images.length > 0 && (
             <div className="mb-4">
               <p className="text-sm text-gray-500 mb-2">Images actuelles :</p>
               <div className="flex flex-wrap gap-3">
-                {images.map((url, i) => (
-                  <div key={i} className="relative w-28 h-28">
+                {images.map((img, i) => (
+                  <div key={img.publicId || i} className="relative w-28 h-28">
                     <img
-                      src={url.startsWith('http') ? url : `${BASE_URL}${url}`}
+                      src={img.url}
                       alt=""
                       className="w-full h-full object-cover rounded-lg border"
                       onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
@@ -332,7 +351,7 @@ export default function AnnonceForm() {
             </div>
           )}
 
-          {/* Nouvelles images */}
+          {/* Nouvelles images (pas encore uploadées) */}
           {previews.length > 0 && (
             <div className="mb-4">
               <p className="text-sm text-gray-500 mb-2">Nouvelles images :</p>

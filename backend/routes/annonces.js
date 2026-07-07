@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const auth = require('../middleware/authMiddleware');
+const cloudinary = require('../config/cloudinary');
 
 // ─── UTILITAIRES ───────────────────────────────────────
 
@@ -49,6 +50,20 @@ const cleanData = (data) => {
   return cleaned;
 };
 
+/**
+ * Supprime en parallèle une liste de public_id Cloudinary.
+ * Ne bloque jamais la requête principale si Cloudinary échoue.
+ */
+async function destroyCloudinaryImages(publicIds = []) {
+  const ids = publicIds.filter(Boolean);
+  if (ids.length === 0) return;
+  try {
+    await Promise.all(ids.map(pid => cloudinary.uploader.destroy(pid)));
+  } catch (err) {
+    console.error('Erreur suppression Cloudinary :', err.message);
+  }
+}
+
 // ─── ROUTES PUBLIQUES ──────────────────────────────────
 
 /**
@@ -83,13 +98,10 @@ router.get('/', async (req, res) => {
     const sortField = allowedSort.includes(sort) ? sort : 'created_at';
     const sortOrder = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    // CORRECTION : On s'assure à 100% que ce sont des nombres entiers natifs
     const limitVal = Math.max(1, parseInt(limit) || 12);
     const offset = Math.max(0, (parseInt(page) - 1) * limitVal);
     const whereClause = where.join(' AND ');
 
-    // CORRECTION ALTERNATIVE : On injecte directement limitVal et offset dans le SQL 
-    // pour éviter les caprices des placeholders MySQL '?' avec les clauses LIMIT/OFFSET.
     const sql = `
       SELECT a.*, 
         (SELECT url FROM annonce_images 
@@ -100,7 +112,6 @@ router.get('/', async (req, res) => {
       LIMIT ${limitVal} OFFSET ${offset}
     `;
 
-    // On passe uniquement 'params' car LIMIT et OFFSET sont maintenant intégrés en toute sécurité (puisqu'on les a castés en Int)
     const [annonces] = await db.query(sql, params);
     const [countRows] = await db.query(`SELECT COUNT(*) as total FROM annonces a WHERE ${whereClause}`, params);
 
@@ -126,7 +137,10 @@ router.get('/slug/:slug', async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ message: 'Annonce introuvable' });
 
     const annonce = rows[0];
-    const [images] = await db.query('SELECT * FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC', [annonce.id]);
+    const [images] = await db.query(
+      'SELECT id, url, public_id AS publicId, is_principale FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC',
+      [annonce.id]
+    );
     const [features] = await db.query('SELECT feature FROM annonce_features WHERE annonce_id = ?', [annonce.id]);
 
     if (await columnExists('annonces', 'nb_vues')) {
@@ -148,7 +162,10 @@ router.get('/:id', async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ message: 'Annonce introuvable' });
 
     const annonce = rows[0];
-    const [images] = await db.query('SELECT * FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC', [annonce.id]);
+    const [images] = await db.query(
+      'SELECT id, url, public_id AS publicId, is_principale FROM annonce_images WHERE annonce_id = ? ORDER BY is_principale DESC',
+      [annonce.id]
+    );
     const [features] = await db.query('SELECT feature FROM annonce_features WHERE annonce_id = ?', [annonce.id]);
 
     res.json({ ...annonce, images, features: features.map(f => f.feature) });
@@ -162,15 +179,8 @@ router.get('/:id', async (req, res) => {
 /**
  * GET /api/annonces/admin/all
  */
-/**
- * GET /api/annonces/admin/all
- */
-/**
- * GET /api/annonces/admin/all
- */
 router.get('/admin/all', auth, async (req, res) => {
   try {
-    // 1. AJOUT de type_bien ici dans la déstructuration
     const { statut, type_transaction, type_bien, page = 1, limit = 20, search } = req.query;
     let where = ['1=1'];
     let params = [];
@@ -185,7 +195,6 @@ router.get('/admin/all', auth, async (req, res) => {
       params.push(type_transaction); 
     }
 
-    // 2. AJOUT de la condition SQL pour filtrer par type de bien
     if (type_bien) {
       where.push('type_bien = ?');
       params.push(type_bien);
@@ -257,6 +266,7 @@ router.get('/admin/stats', auth, async (req, res) => {
 /**
  * POST /api/annonces
  * Création complète avec transaction SQL
+ * req.body.images attendu sous la forme : [{ url, publicId }, ...]
  */
 router.post('/', auth, async (req, res) => {
   const conn = await db.getConnection();
@@ -276,10 +286,13 @@ router.post('/', auth, async (req, res) => {
       await conn.query('UPDATE annonces SET slug = ? WHERE id = ?', [slugValue, annonceId]);
     }
 
-    // Insertion Images
+    // Insertion Images (Cloudinary : url + public_id)
     if (images.length > 0) {
-      const imgQueries = images.map((url, i) => 
-        conn.query('INSERT INTO annonce_images (annonce_id, url, is_principale) VALUES (?,?,?)', [annonceId, url, i === 0 ? 1 : 0])
+      const imgQueries = images.map((img, i) =>
+        conn.query(
+          'INSERT INTO annonce_images (annonce_id, url, public_id, is_principale) VALUES (?,?,?,?)',
+          [annonceId, img.url, img.publicId || null, i === 0 ? 1 : 0]
+        )
       );
       await Promise.all(imgQueries);
     }
@@ -305,6 +318,8 @@ router.post('/', auth, async (req, res) => {
 
 /**
  * PUT /api/annonces/:id
+ * req.body.images attendu sous la forme : [{ url, publicId }, ...]
+ * Les images retirées par l'utilisateur sont automatiquement supprimées de Cloudinary.
  */
 router.put('/:id', auth, async (req, res) => {
   const conn = await db.getConnection();
@@ -323,11 +338,24 @@ router.put('/:id', auth, async (req, res) => {
     // Update table principale
     await conn.query('UPDATE annonces SET ? WHERE id = ?', [fields, annonceId]);
 
+    // Récupère les anciennes images pour savoir lesquelles ont été retirées
+    const [oldImages] = await conn.query(
+      'SELECT public_id AS publicId FROM annonce_images WHERE annonce_id = ?',
+      [annonceId]
+    );
+    const newPublicIds = new Set(images.map(img => img.publicId).filter(Boolean));
+    const removedPublicIds = oldImages
+      .map(img => img.publicId)
+      .filter(pid => pid && !newPublicIds.has(pid));
+
     // Refresh Images (Supprimer puis ré-insérer)
     await conn.query('DELETE FROM annonce_images WHERE annonce_id = ?', [annonceId]);
     if (images.length > 0) {
-      const imgQueries = images.map((url, i) => 
-        conn.query('INSERT INTO annonce_images (annonce_id, url, is_principale) VALUES (?,?,?)', [annonceId, url, i === 0 ? 1 : 0])
+      const imgQueries = images.map((img, i) =>
+        conn.query(
+          'INSERT INTO annonce_images (annonce_id, url, public_id, is_principale) VALUES (?,?,?,?)',
+          [annonceId, img.url, img.publicId || null, i === 0 ? 1 : 0]
+        )
       );
       await Promise.all(imgQueries);
     }
@@ -342,6 +370,10 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     await conn.commit();
+
+    // Nettoyage Cloudinary après le commit (ne bloque pas la réponse en cas d'échec)
+    destroyCloudinaryImages(removedPublicIds);
+
     res.json({ message: 'Annonce mise à jour', slug: fields.slug || null });
   } catch (err) {
     await conn.rollback();
@@ -365,15 +397,20 @@ router.patch('/:id/statut', auth, async (req, res) => {
 
 /**
  * DELETE /api/annonces/:id
+ * Nettoie aussi les images correspondantes sur Cloudinary.
  */
 router.delete('/:id', auth, async (req, res) => {
   try {
-    // Note: Si vos tables sont en ON DELETE CASCADE, les images/features suivront. 
-    // Sinon, décommenter les lignes ci-dessous :
-    // await db.query('DELETE FROM annonce_images WHERE annonce_id = ?', [req.params.id]);
-    // await db.query('DELETE FROM annonce_features WHERE annonce_id = ?', [req.params.id]);
-    
+    const [images] = await db.query(
+      'SELECT public_id AS publicId FROM annonce_images WHERE annonce_id = ?',
+      [req.params.id]
+    );
+
+    // Les lignes annonce_images/annonce_features suivent via ON DELETE CASCADE
     await db.query('DELETE FROM annonces WHERE id = ?', [req.params.id]);
+
+    await destroyCloudinaryImages(images.map(img => img.publicId));
+
     res.json({ message: 'Annonce supprimée définitivement' });
   } catch (err) {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });

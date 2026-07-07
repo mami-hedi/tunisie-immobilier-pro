@@ -1,7 +1,6 @@
 -- backend/database.sql
 CREATE DATABASE IF NOT EXISTS immo_tunisie;
 USE immo_tunisie;
-
 -- Table des administrateurs
 CREATE TABLE admins (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -10,7 +9,6 @@ CREATE TABLE admins (
   password VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
 -- Table des annonces
 CREATE TABLE annonces (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -38,14 +36,15 @@ CREATE TABLE annonces (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 -- Table des images des annonces
+-- public_id : identifiant Cloudinary, indispensable pour pouvoir supprimer l'image du CDN
 CREATE TABLE annonce_images (
   id INT AUTO_INCREMENT PRIMARY KEY,
   annonce_id INT NOT NULL,
   url VARCHAR(500) NOT NULL,
+  public_id VARCHAR(255),
   is_principale BOOLEAN DEFAULT FALSE,
   FOREIGN KEY (annonce_id) REFERENCES annonces(id) ON DELETE CASCADE
 );
-
 -- Table des caractéristiques (équipements)
 CREATE TABLE annonce_features (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -53,7 +52,6 @@ CREATE TABLE annonce_features (
   feature VARCHAR(100) NOT NULL,
   FOREIGN KEY (annonce_id) REFERENCES annonces(id) ON DELETE CASCADE
 );
-
 -- Admin par défaut (mot de passe: Admin@123)
 INSERT INTO admins (nom, email, password)
 VALUES (

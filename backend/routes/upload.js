@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('../config/cloudinary');
 const auth = require('../middleware/authMiddleware');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname));
-  }
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'tunisie-immobilier',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto' }],
+  },
 });
 
 const upload = multer({
@@ -23,8 +25,21 @@ const upload = multer({
 
 // POST /api/upload (multi-image)
 router.post('/', auth, upload.array('images', 10), (req, res) => {
-  const urls = req.files.map(f => `/uploads/${f.filename}`);
-  res.json({ urls });
+  const urls = req.files.map(f => f.path);         // URL https complète Cloudinary
+  const publicIds = req.files.map(f => f.filename); // public_id Cloudinary (pour suppression future)
+  res.json({ urls, publicIds });
+});
+
+// DELETE /api/upload — supprime une image du CDN Cloudinary
+router.delete('/', auth, async (req, res) => {
+  const { publicId } = req.body;
+  if (!publicId) return res.status(400).json({ message: 'publicId requis' });
+  try {
+    await cloudinary.uploader.destroy(publicId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 module.exports = router;
