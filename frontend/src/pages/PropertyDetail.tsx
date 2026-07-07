@@ -13,6 +13,11 @@ import {
 
 const BASE_URL = "https://tunisie-immobilier-pro.onrender.com";
 
+// Cloudinary renvoie déjà une URL https complète (ex: https://res.cloudinary.com/...).
+// On ne préfixe que les anciennes images encore stockées localement (ex: /uploads/xxx.jpg).
+const resolveImageUrl = (url: string) =>
+  url.startsWith('http') ? url : `${BASE_URL}${url}`;
+
 function formatPrice(price: number, transaction: string) {
   const formatted = new Intl.NumberFormat("fr-TN").format(price);
   return transaction === "location" ? `${formatted} DT / mois` : `${formatted} DT`;
@@ -35,7 +40,7 @@ function adaptAnnonce(a: any) {
     address: a.adresse || "",
     description: a.description || "",
     images: a.images?.length
-      ? a.images.map((img: any) => `${BASE_URL}${img.url}`)
+      ? a.images.map((img: any) => resolveImageUrl(img.url))
       : ["/placeholder.svg"],
     features: a.features || [],
     nb_vues: Number(a.nb_vues) || 0,
@@ -64,7 +69,7 @@ function adaptAnnonceSimple(a: any) {
     city: a.ville,
     address: a.adresse || "",
     description: a.description || "",
-    images: a.image_principale ? [`${BASE_URL}${a.image_principale}`] : ["/placeholder.svg"],
+    images: a.image_principale ? [resolveImageUrl(a.image_principale)] : ["/placeholder.svg"],
     features: [],
     contact: { name: a.nom_contact || "", phone: a.tel_contact || "", email: a.email_contact || "" },
     createdAt: a.created_at,

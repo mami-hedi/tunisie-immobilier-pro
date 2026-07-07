@@ -9,6 +9,11 @@ import { api } from "@/lib/api";
 
 const BASE_URL = "https://tunisie-immobilier-pro.onrender.com";
 
+// Cloudinary renvoie déjà une URL https complète (ex: https://res.cloudinary.com/...).
+// On ne préfixe que les anciennes images encore stockées localement (ex: /uploads/xxx.jpg).
+const resolveImageUrl = (url: string) =>
+  url.startsWith('http') ? url : `${BASE_URL}${url}`;
+
 const features = [
   {
     icon: Shield,
@@ -55,7 +60,7 @@ function adaptAnnonce(a: any) {
     address: a.adresse || "",
     description: a.description || "",
     images: a.image_principale
-      ? [`${BASE_URL}${a.image_principale}`]
+      ? [resolveImageUrl(a.image_principale)]
       : ["/placeholder.svg"],
     features: [],
     contact: {

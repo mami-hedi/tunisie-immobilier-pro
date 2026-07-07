@@ -15,6 +15,12 @@ const STATUT_COLORS: Record<string, string> = {
   inactive:   'bg-gray-100 text-gray-500 border-gray-200',
 };
 
+// Cloudinary renvoie déjà une URL https complète (ex: https://res.cloudinary.com/...).
+// On ne préfixe que les anciennes images encore stockées localement (ex: /uploads/xxx.jpg).
+const BASE_URL = 'https://tunisie-immobilier-pro.onrender.com';
+const resolveImageUrl = (url: string) =>
+  url.startsWith('http') ? url : `${BASE_URL}${url}`;
+
 export default function AdminDashboard() {
   const navigate   = useNavigate();
   const { logout, admin } = useAuth();
@@ -331,7 +337,7 @@ export default function AdminDashboard() {
                             <div className="w-12 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                               {a.image_principale ? (
                                 <img
-                                  src={`http://localhost:5000${a.image_principale}`}
+                                  src={resolveImageUrl(a.image_principale)}
                                   alt=""
                                   className="w-full h-full object-cover"
                                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
